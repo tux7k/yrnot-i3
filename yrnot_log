@@ -1,0 +1,12 @@
+#!/bin/sh
+
+cfgsource="/home/$(whoami)/.config/yrnot/cfg"
+
+if [ -f $cfgsource ]; then
+    source $cfgsource
+    cacheloc="/home/$(whoami)/.cache/yrnot.cache"
+    rm $cacheloc > /dev/null 2>&1
+    curl -A 'tux/0.1' -s "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat}&lon=${lon}" -o $cacheloc
+    yrn -n
+    exec pkill -SIGRTMIN+10 i3blocks
+fi

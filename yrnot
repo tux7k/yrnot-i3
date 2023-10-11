@@ -1,0 +1,145 @@
+#!/bin/sh
+
+# yrnot (yr.no terminal forecast grabber) v1
+# A scripts that grabs yr.no forecasts through the api, parses it using json, and displays it beautifully with formatting
+#
+# dependencies:
+# curl
+# jq
+#
+# Licensed under GPL 3.0
+# by tuck
+
+# --- FILTERS
+# Current Obs - instant - next hour
+export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/usr/1000/bus
+export DISPLAY=:0.0
+export XAUTHORITY=/home/tux/.Xauthority
+
+if [ -r "$HOME/.dbus/Xdbus" ]; then
+    source "$HOME/.dbus/Xdbus"
+fi
+
+
+nextOneHour=".properties.timeseries[0].data.next_1_hours" # data in the next one hour
+currentObs=".properties.timeseries[0].data.instant.details" # instant data
+currentTempCel="${currentObs}.air_temperature" # Air Temperature
+currentPASLhPa="${currentObs}.air_pressure_at_sea_level" # Air Pressure @ Sea Level (hPa)
+currentCAF="${currentObs}.cloud_area_fraction" # Cloud Area Fraction (%)
+currentHumidity="${currentObs}.relative_humidity" # Relative Humidity (%)
+currentWindDirection="${currentObs}.wind_from_direction" # Wind Direction (deg)
+currentWindSpeed="${currentObs}.wind_speed" # Wind Speed (m/s)
+precipOneHour="${nextOneHour}.details.precipitation_amount"
+conditionsOneHour="${nextOneHour}.summary.symbol_code"
+
+# --- MAIN
+cachesource="/home/$(whoami)/.cache/yrnot.cache"
+cfgsource="/home/$(whoami)/.config/yrnot/cfg"
+if [ -f $cfgsource ]; then
+    source $cfgsource
+    
+    # --- GET THE DATA
+    if [ -f $cachesource ] && [[ $1 != "-f" ]]; then
+        yrnodata=$(cat $cachesource)
+    else
+        yrnodata=$(curl -A 'tux/0.1' -s "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat}&lon=${lon}")
+    fi
+    # --- RUN FILTERS - for more info read the filters area
+    cTempC=$(echo ${yrnodata} | jq ${currentTempCel})
+    cPressurehPa=$(echo ${yrnodata} | jq ${currentPASLhPa})
+    cCAFp=$(echo ${yrnodata} | jq ${currentCAF})
+    cRHumidP=$(echo ${yrnodata} | jq ${currentHumidity})
+    cWindDirectionD=$(echo ${yrnodata} | jq ${currentWindDirection})
+    cWindSpeedMS=$(echo ${yrnodata} | jq ${currentWindSpeed})
+    cPrecipOneHour=$(echo ${yrnodata} | jq ${precipOneHour})
+    cCondOneHour=$(echo ${yrnodata} | jq ${conditionsOneHour})
+    cCondOneHour=$(echo "${cCondOneHour}" | sed "s/\"//g" )
+
+    case "$cCondOneHour" in 
+        clearsky_day) cCondOneHour="️️☀️ Sunny"; cCondOneHourEmoji="☀️" ;;
+        clearsky_night) cCondOneHour="🌙 Night"; cCondOneHourEmoji="🌙" ;;
+        partlycloudy_day) cCondOneHour="🌤️ Partly Cloudy"; cCondOneHourEmoji="️🌤️" ;;
+        partlycloudy_night) cCondOneHour="🌤️ Partly Cloudy"; cCondOneHourEmoji="️🌤️" ;;
+        fair_day) cCondOneHour="⛅ Fair Day"; cCondOneHourEmoji="⛅" ;;        
+        fair_night) cCondOneHour="⛅ Fair Night"; cCondOneHourEmoji="⛅" ;;
+        cloudy) cCondOneHour="☁️  Cloudy"; cCondOneHourEmoji="☁️" ;;
+        rainshowers_day) cCondOneHour="🌦️ Rain Showers"; cCondOneHourEmoji="🌦️";;
+        lightrainshowers_day) cCondOneHour="🌦️ Light Rain Showers"; cCondOneHourEmoji="🌦️";;
+        lightrainshowers_night) cCondOneHour="🌦️ Light Rain Showers"; cCondOneHourEmoji="🌦️";;
+        heavyrainshowers_day) cCondOneHour="🌦️ Heavy Rain Showers"; cCondOneHourEmoji="🌦️";;
+        heavyrainshowers_night) cCondOneHour="🌦️ Heavy Rain Showers"; cCondOneHourEmoji="🌦️";;
+        rainshowers_night) cCondOneHour="🌦️ Rain Showers"; cCondOneHourEmoji="🌦️";;
+        rainshowersandthunder_day) cCondOneHour="⛈️  Rain Showers and Thunder"; cCondOneHourEmoji="⛈️";;
+        rainshowersandthunder_night) cCondOneHour="⛈️  Rain Showers and Thunder"; cCondOneHourEmoji="⛈️";;
+        sleetshowers_day) cCondOneHour="🌨️ Sleet Showers"; cCondOneHourEmoji="🌨️";;
+        sleetshowers_night) cCondOneHour="🌨️ Sleet Showers"; cCondOneHourEmoji="🌨️";;
+        lightsleetshowers_day) cCondOneHour="🌨️ Light Sleet Showers"; cCondOneHourEmoji="🌨️";;
+        lightsleetshowers_night) cCondOneHour="🌨️ Light Sleet Showers"; cCondOneHourEmoji="🌨️";;
+        heavysleetshowers_day) cCondOneHour="🌨️ Heavy Sleet Showers"; cCondOneHourEmoji="🌨️";;
+        heavysleetshowers_night) cCondOneHour="🌨️ Heavy Sleet Showers"; cCondOneHourEmoji="🌨️";;
+        snowshowers_day) cCondOneHour="🌨️ Snow Showers"; cCondOneHourEmoji="🌨️";;
+        snowshowers_night) cCondOneHour="🌨️ Snow Showers"; cCondOneHourEmoji="🌨️";;
+        lightsnowshowers_day) cCondOneHour="🌨️ Light Snow Showers"; cCondOneHourEmoji="🌨️";;
+        lightsnowshowers_night) cCondOneHour="🌨️ Light Snow Showers"; cCondOneHourEmoji="🌨️";;
+        heavysnowshowers_day) cCondOneHour="🌨️ Heavy Snow Showers"; cCondOneHourEmoji="🌨️";;
+        heavysnowshowers_night) cCondOneHour="🌨️ Heavy Snow Showers"; cCondOneHourEmoji="🌨️";;
+        rain) cCondOneHour="🌧️ Rain"; cCondOneHourEmoji="🌧️";;
+        lightrain) cCondOneHour="🌧️ Light Rain"; cCondOneHourEmoji="🌧️";;
+        heavyrain) cCondOneHour="🌧️ Heavy Rain"; cCondOneHourEmoji="🌧️";;
+        heavyrainandthunder) cCondOneHour="⛈️  Heavy Rain and Thunder"; cCondOneHourEmoji="⛈️";;
+        sleet) cCondOneHour="🌨️ Sleet"; cCondOneHourEmoji="🌨️";;
+        lightsleet) cCondOneHour="🌨️ Light Sleet"; cCondOneHourEmoji="🌨️";;
+        heavysleet) cCondOneHour="🌨️ Heavy Sleet"; cCondOneHourEmoji="🌨️";;
+        lightsnow) cCondOneHour="🌨️ Light Snow"; cCondOneHourEmoji="🌨️";;
+        heavysnow) cCondOneHour="🌨️ Heavy Snow"; cCondOneHourEmoji="🌨️";;
+        snow) cCondOneHour="🌨️ Snow"; cCondOneHourEmoji="🌨️";;
+        fog) cCondOneHour="🌫️ Fog"; cCondOneHourEmoji="🌫️";;
+        snowandthunder) cCondOneHour="🌨️⚡ Snow and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        sleetshowersandthunder_day) cCondOneHour="🌨️⚡ Sleet Showers and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        sleetshowersandthunder_night) cCondOneHour="🌨️⚡ Sleet Showers and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        snowshowersandthunder_day) cCondOneHour="🌨️⚡ Snow Showers and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        snowshowersandthunder_night) cCondOneHour="🌨️⚡ Snow Showers and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        rainandthunder) cCondOneHour="⛈️  Rain and Thunder"; cCondOneHourEmoji="⛈️";;
+        lightrainandthunder) cCondOneHour="⛈️  Light Rain and Thunder"; cCondOneHourEmoji="⛈️";;
+        sleetandthunder) cCondOneHour="🌨️⚡ Sleet and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        lightsleetandthunder) cCondOneHour="🌨️⚡ Light Sleet and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        heavysleetandthunder) cCondOneHour="🌨️⚡ Heavy Sleet and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        lightsnowandthunder) cCondOneHour="🌨️⚡ Light Snow and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        heavysnowandthunder) cCondOneHour="🌨️⚡ Light Snow and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        lightrainshowersandthunder_day) cCondOneHour="🌦️⚡ Light Rain Showers and Thunder"; cCondOneHourEmoji="🌦️⚡";;
+        lightrainshowersandthunder_night) cCondOneHour="🌦️⚡ Light Rain Showers and Thunder"; cCondOneHourEmoji="🌦️⚡";;
+        heavyrainshowersandthunder_day) cCondOneHour="🌦️⚡ Heavy Rain Showers and Thunder"; cCondOneHourEmoji="🌦️⚡";;
+        heavyrainshowersandthunder_night) cCondOneHour="🌦️⚡ Heavy Rain Showers and Thunder"; cCondOneHourEmoji="🌦️⚡";;
+        lightsleetshowersandthunder_day) cCondOneHour="🌨️⚡ Light Sleet Showers and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        lightsleetshowersandthunder_night) cCondOneHour="🌨️⚡ Light Sleet Showers and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        heavysleetshowersandthunder_day) cCondOneHour="🌨️⚡ Heavy Sleet Showers and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        heavysleetshowersandthunder_night) cCondOneHour="🌨️⚡ Heavy Sleet Showers and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        lightsnowshowersandthunder_day) cCondOneHour="🌨️⚡ Light Snow Showers and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        lightsnowshowersandthunder_night) cCondOneHour="🌨️⚡ Light Snow Showers and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        heavysnowshowersandthunder_day) cCondOneHour="🌨️⚡ Heavy Snow Showers and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        heavysnowshowersandthunder_night) cCondOneHour="🌨️⚡ Heavy Snow Showers and Thunder"; cCondOneHourEmoji="🌨️⚡";;
+        
+    esac
+    if [[ $1 == "-n" ]] || [[ $2 == "-n" ]]; then
+        if [[ $cCondOneHour == *"Snow"* ]] || [[ $cCondOneHour == *"Sleet"* ]] || [[ $cCondOneHour == *"Rain"* ]]; then
+           notify-send "${cPrecipOneHour} mm of ${cCondOneHour}" "coming in the next hour."
+        else
+            notify-send "${cCondOneHour}" "in the next hour."
+        fi
+        exit
+    fi
+    if [[ $1 == "-s" ]] || [[ $2 == "-s" ]]; then
+        echo "${cCondOneHourEmoji} - 🌡️ ${cTempC} C - ☂️  ${cPrecipOneHour} mm"
+    else
+        echo "${cCondOneHour}"
+        echo "------------------------"
+        echo "🌡️  Temperature: ${cTempC} C"
+        echo "⚗️  Humidity: ${cRHumidP}%"
+        echo "☁️  Cloud Cover: ${cCAFp}%"
+        echo "💨  Wind: ${cWindSpeedMS} m/s - ${cWindDirectionD} deg"
+        echo "☂️  Precipitation (next hour): ${cPrecipOneHour} mm"
+    fi
+fi
+
+
+# jq '.properties.timeseries[0].data' yrexample.json

@@ -1,0 +1,10 @@
+#!/bin/sh
+
+/home/$(whoami)/scripts/yrnot/yrnot_log     
+
+interval=3600
+while [[ true ]]; do
+    now=$(date +%s) # timestamp in seconds
+    sleep $((interval - now % interval))
+    /home/$(whoami)/scripts/yrnot/yrnot_log     
+done
